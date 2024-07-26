@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Recommendation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .amenity {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+        }
+        .details {
+            margin-top: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Location Recommendation</h1>
+        <form id="inputForm">
+            <label for="currentLocation">Current Location (latitude, longitude)</label>
+            <input type="text" id="currentLocation" name="currentLocation" readonly>
+            <button type="button" onclick="getCurrentLocation()">Use Current Location</button>
+            
+            <label for="city">City</label>
+            <input type="text" id="city" name="city" required>
+            
+            <label for="country">Country</label>
+            <input type="text" id="country" name="country" required>
+            
+            <label for="bestLocationType">Best Location Type</label>
+            <input type="text" id="bestLocationType" name="bestLocationType" required>
+            
+            <label for="timePreference">Time Preference (1-5)</label>
+            <input type="number" id="timePreference" name="timePreference" min="1" max="5" required>
+            
+            <label for="ratingPreference">Rating Preference (1-5)</label>
+            <input type="number" id="ratingPreference" name="ratingPreference" min="1" max="5" required>
+            
+            <label for="minRating">Minimum Rating</label>
+            <input type="number" id="minRating" name="minRating" step="0.1" required>
+            
+            <label for="amenitiesList">Amenities (comma separated)</label>
+            <input type="text" id="amenitiesList" name="amenitiesList" required>
+            
+            <label for="radius">Radius (meters)</label>
+            <input type="number" id="radius" name="radius" required>
+            
+            <button type="button" onclick="fetchRecommendation()">Find Location</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <h2>Recommendation Result</h2>
+            <p><strong>Chosen Best Location:</strong></p>
+            <p><strong>Name:</strong> <span id="chosenBestLocationName"></span></p>
+            <p><strong>Address:</strong> <span id="chosenBestLocationAddress"></span></p>
+            <p><strong>Rating:</strong> <span id="chosenBestLocationRating"></span></p>
+            <p><strong>Travel Time to Current Location:</strong> <span id="travelTimeToCurrentLocation"></span></p>
+            
+            <div id="distancesToAmenities">
+                <h3>Distances to Amenities from Best Location</h3>
+                <div id="amenitiesListContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                document.getElementById('currentLocation').value = 'Fetching location...';
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        var latitude = position.coords.latitude.toFixed(6);
+                        var longitude = position.coords.longitude.toFixed(6);
+                        document.getElementById('currentLocation').value = latitude + ', ' + longitude;
+                    },
+                    function(error) {
+                        console.error('Error getting current location:', error);
+                        alert('Failed to fetch location. Error: ' + error.message);
+                        document.getElementById('currentLocation').value = '';
+                    }
+                );
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        }
+
+        function fetchRecommendation() {
+            var requestBody = {
+                current_location: document.getElementById('currentLocation').value,
+                city: document.getElementById('city').value,
+                country: document.getElementById('country').value,
+                best_location_type: document.getElementById('bestLocationType').value,
+                time_preference: parseInt(document.getElementById('timePreference').value),
+                rating_preference: parseInt(document.getElementById('ratingPreference').value),
+                min_rating: parseFloat(document.getElementById('minRating').value),
+                amenities_list: document.getElementById('amenitiesList').value.split(',').map(item => item.trim()),
+                radius: parseInt(document.getElementById('radius').value)  // Add radius to request body
+            };
+
+            var apiUrl = 'http://localhost:5000/find_best_location';
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', apiUrl, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        var response = JSON.parse(xhr.responseText);
+                        displayResult(response);
+                    } else {
+                        alert('Failed to fetch recommendation. Status code: ' + xhr.status);
+                    }
+                }
+            };
+            xhr.send(JSON.stringify(requestBody));
+        }
+
+        function displayResult(response) {
+            document.getElementById('chosenBestLocationName').textContent = response.chosen_best_location.name;
+            document.getElementById('chosenBestLocationAddress').textContent = response.chosen_best_location.address;
+            document.getElementById('chosenBestLocationRating').textContent = response.chosen_best_location.rating;
+            document.getElementById('travelTimeToCurrentLocation').textContent = response.travel_time_to_current_location;
+
+            var amenitiesListContainer = document.getElementById('amenitiesListContainer');
+            amenitiesListContainer.innerHTML = '';
+
+            response.distances_to_amenities.forEach(function(amenity) {
+                var amenityDiv = document.createElement('div');
+                amenityDiv.classList.add('amenity');
+
+                var title = document.createElement('p');
+                title.textContent = 'Closest ' + amenity.amenity + ': ' + amenity.distance_km.toFixed(2) + ' km';
+                amenityDiv.appendChild(title);
+
+                var details = document.createElement('div');
+                details.classList.add('details');
+                details.innerHTML = '<p>Name: ' + amenity.name + '</p>' +
+                                    '<p>Address: ' + amenity.address + '</p>' +
+                                    '<p>Rating: ' + amenity.rating + '</p>';
+                amenityDiv.appendChild(details);
+
+                amenitiesListContainer.appendChild(amenityDiv);
+            });
+
+            document.getElementById('result').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
